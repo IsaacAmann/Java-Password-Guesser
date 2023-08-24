@@ -6,6 +6,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.lang.Thread;
 import java.util.LinkedList;
+import java.util.concurrent.*;
+import java.util.concurrent.TimeUnit;
 
 public class PasswordGuesser
 {
@@ -15,11 +17,10 @@ public class PasswordGuesser
 	
 	public static boolean hashFound = false;
 	public static String foundPassword;
-	private static ArrayList<HashCheckThread> threads;
 	public static byte[] passwordHash;
 	public static char[] passwordSpace = new char[MAX_PASSWORD_LENGTH];
 	public static MessageDigest messageDigest;
-	public static ManagerThread managerThread;
+	public static ExecutorService threadPool;
 	
 	public static void main(String[] args) throws NoSuchAlgorithmException
 	{
@@ -28,51 +29,27 @@ public class PasswordGuesser
 		messageDigest.update(text.getBytes(StandardCharsets.UTF_8));
 		passwordHash = messageDigest.digest();
 		
+		threadPool = Executors.newFixedThreadPool(NUM_THREADS);
+		
 		String hex = String.format("%064x", new BigInteger(1, passwordHash));
 		System.out.println("Hash testing for: " +  hex);
 		
-		threads = new ArrayList<HashCheckThread>();
-		for(int i = 0; i < NUM_THREADS; i++)
-		{
-			threads.add(new HashCheckThread(passwordHash));
-		}
-		
-		managerThread = new ManagerThread(threads);
-		managerThread.start();
-		
-		//Wait for threads to end
-		
+		iterateStringsLoop(null, MAX_PASSWORD_LENGTH - 1);
+		//Wait for threadpool to shutdown
 		try
 		{
-			managerThread.join();
+			threadPool.awaitTermination(5, TimeUnit.SECONDS);
 		}
-		catch (InterruptedException e)
+		catch(InterruptedException e)
 		{
-			System.out.println(e.getMessage());
+			
 		}
-		
-		
 		System.out.println("Found password: " + foundPassword);
 		//hashCheckLoop(null, MAX_PASSWORD_LENGTH - 1);
 		//Check if arrays equal Array.equal(a,b)
 	}
 	
-	public static void manageThreads()
-	{
-		System.out.println("");
-		for(int i = 0; i < threads.size(); i++)
-		{
-			System.out.println("Thread " + i + "  " + threads.get(i).getCurrentHashString());
-		}
-		if(hashFound == true)
-		{
-			//Stop threads if hash was found 
-			for(int i = 0; i < threads.size(); i++)
-			{
-				threads.get(i).destroy();
-			}
-		}
-	}
+	
 	
 	public static boolean checkHash(String currentString)
 	{
@@ -92,18 +69,20 @@ public class PasswordGuesser
 		return output;
 	}
 	
-	public static void hashCheckLoop(char[] currentString, int currentIndex)
+	//Add strings 
+	private static void iterateStringsLoop(char[] currentString, int currentIndex)
 	{
+		
 		//Statements to be run in the first iteration
 		if(currentString == null)
 		{
-			currentString = new char[MAX_PASSWORD_LENGTH];
+			currentString = new char[PasswordGuesser.MAX_PASSWORD_LENGTH];
 			//Set all chars to null character
 			for(int i = 0; i < currentString.length; i++)
 				currentString[i] = 0;
 		}
 
-		for(int i = 0; i < MAX_ASCII_CODE; i++)
+		for(int i = 0; i < PasswordGuesser.MAX_ASCII_CODE; i++)
 		{
 			//Skipping characters between 0 and 33
 			if(i > 0 && i < 32)
@@ -111,13 +90,25 @@ public class PasswordGuesser
 			currentString[currentIndex] = (char)i;
 			//System.out.println(String.copyValueOf(currentString).trim());
 			//Hash current string and stop loop if it is found
-			if(checkHash(String.copyValueOf(currentString).trim()) == true)
+			//System.out.println(String.copyValueOf(currentString).trim());
+			//System.out.println(currentString);
+			//workQueue.add(String.copyValueOf(currentString).trim());
+			try
+			{
+				threadPool.execute(new HashCheckThread(passwordHash, String.copyValueOf(currentString).trim()));
+			}
+			catch(Exception exception)
+			{
+				//exception.printStackTrace();
+			}
+			if(PasswordGuesser.hashFound == true)
 			{
 				currentIndex = 0;
-				hashFound = true;
+				threadPool.shutdownNow();
+				break;
 			}
 			if(currentIndex > 0)
-				hashCheckLoop(currentString, currentIndex - 1);
+				iterateStringsLoop(currentString, currentIndex - 1);
 		}
 	}
 }

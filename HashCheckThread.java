@@ -13,14 +13,15 @@ public class HashCheckThread extends Thread
 	private byte[] currentStringHash;
 	private int startASCIICode;
 	private int endASCIICode;
+	private String currentString;
 	
-	public HashCheckThread(byte[] passwordHash) throws NoSuchAlgorithmException
+	public HashCheckThread(byte[] passwordHash, String currentString) throws NoSuchAlgorithmException
 	{
 		messageDigest = MessageDigest.getInstance("SHA-256");
 		this.passwordHash = passwordHash;
 		this.startASCIICode = startASCIICode;
 		this.endASCIICode = endASCIICode;
-		
+		this.currentString = currentString;
 	}
 	
 	public String getCurrentHashString()
@@ -39,14 +40,8 @@ public class HashCheckThread extends Thread
 	@Override
 	public void run()
 	{
-		String currentWorkItem = PasswordGuesser.managerThread.getWorkItem();
-		//Get string from manager thread, hash it, and check for match until some thread finds it
-		while(PasswordGuesser.hashFound != true)
-		{
-			if(currentWorkItem != null)
-				checkHash(currentWorkItem);
-			currentWorkItem = PasswordGuesser.managerThread.getWorkItem();
-		}
+		checkHash(currentString);
+	
 	}
 	
 	private boolean checkHash(String currentString)
