@@ -35,6 +35,7 @@ public class PasswordGuesser
 		System.out.println("Hash testing for: " +  hex);
 		
 		iterateStringsLoop(null, MAX_PASSWORD_LENGTH - 1);
+		
 		//Wait for threadpool to shutdown
 		try
 		{
@@ -45,30 +46,8 @@ public class PasswordGuesser
 			
 		}
 		System.out.println("Found password: " + foundPassword);
-		//hashCheckLoop(null, MAX_PASSWORD_LENGTH - 1);
-		//Check if arrays equal Array.equal(a,b)
 	}
-	
-	
-	
-	public static boolean checkHash(String currentString)
-	{
-		boolean output = false;
-		messageDigest.update(currentString.getBytes(StandardCharsets.UTF_8));
-		byte[] currentStringHash = messageDigest.digest();
-		
-		System.out.println(currentString);
-		System.out.println(String.format("%064x", new BigInteger(1, currentStringHash)) +" == " + String.format("%064x", new BigInteger(1, passwordHash)));
-		if(Arrays.equals(currentStringHash, passwordHash))
-		{
-			output = true;
-			foundPassword = String.valueOf(currentString);
-			System.out.println("Found match: " + currentString);
-		}
-		
-		return output;
-	}
-	
+
 	//Add strings 
 	private static void iterateStringsLoop(char[] currentString, int currentIndex)
 	{
@@ -88,13 +67,9 @@ public class PasswordGuesser
 			if(i > 0 && i < 32)
 				i = 33;
 			currentString[currentIndex] = (char)i;
-			//System.out.println(String.copyValueOf(currentString).trim());
-			//Hash current string and stop loop if it is found
-			//System.out.println(String.copyValueOf(currentString).trim());
-			//System.out.println(currentString);
-			//workQueue.add(String.copyValueOf(currentString).trim());
 			try
 			{
+				//Pass string to thread pool to be hashed and checked against the password hash
 				threadPool.execute(new HashCheckThread(passwordHash, String.copyValueOf(currentString).trim()));
 			}
 			catch(Exception exception)
